@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { AppState, DateRange, ReportTone, GitHubPR, GitHubCommit } from './types';
 import { fetchAuthenticatedUser, fetchUserRepositories, fetchUserPullRequests, fetchUserCommits } from './services/githubService';
 import { generateSelfReview } from './services/geminiService';
-import { GitHubIcon, SparklesIcon, RefreshIcon, DocumentIcon, ChevronRightIcon } from './components/Icons';
+import { GitHubIcon, SparklesIcon, RefreshIcon, DocumentIcon, ChevronRightIcon, DownloadIcon } from './components/Icons';
 import ActivityChart from './components/ActivityChart';
 import PRList from './components/PRList';
 import RepoSelector from './components/RepoSelector';
@@ -158,6 +158,66 @@ const App: React.FC = () => {
       setState(s => ({ ...s, status: 'error', error: 'Failed to generate report using AI.' }));
     }
   }, [state.user, state.prs, state.commits, reportTone, customFocus]);
+
+  // --- Export Markdown ---
+  const handleExportMarkdown = () => {
+    if (!state.user) return;
+
+    let md = `# GitHub Activity Report\n`;
+    md += `**User:** @${state.user.login}\n`;
+    md += `**Date Range:** ${state.dateRange.startDate} to ${state.dateRange.endDate}\n`;
+    md += `**Generated:** ${new Date().toISOString().split('T')[0]}\n\n`;
+
+    md += `## Summary Stats\n`;
+    md += `- **Total PRs:** ${state.prs.length}\n`;
+    md += `- **Total Commits:** ${state.commits.length}\n`;
+    md += `- **Active Repositories:** ${new Set([...state.prs.map(p => p.repository_url), ...state.commits.map(c => c.repository_url)]).size}\n\n`;
+
+    if (state.generatedReport) {
+      md += `## AI Generated Review\n\n`;
+      md += `${state.generatedReport}\n\n`;
+      md += `---\n\n`;
+    }
+
+    md += `## Pull Requests\n\n`;
+    if (state.prs.length === 0) {
+      md += `_No pull requests found in this period._\n\n`;
+    } else {
+      state.prs.forEach(pr => {
+        const repoName = pr.repository_url.split('/').pop();
+        const icon = pr.merged_at ? '🟣' : pr.state === 'open' ? '🟢' : '🔴';
+        const impact = (pr.additions !== undefined && pr.deletions !== undefined) 
+          ? `(Impact: +${pr.additions} / -${pr.deletions})` 
+          : '';
+        
+        md += `### ${icon} [${repoName}] ${pr.title} #${pr.number}\n`;
+        md += `- **State:** ${pr.merged_at ? 'Merged' : pr.state}\n`;
+        md += `- **Date:** ${pr.created_at.split('T')[0]}\n`;
+        if (impact) md += `- **Stats:** ${impact}\n`;
+        md += `- **Link:** ${pr.html_url}\n\n`;
+      });
+    }
+
+    md += `## Commits\n\n`;
+    if (state.commits.length === 0) {
+      md += `_No commits found in this period._\n\n`;
+    } else {
+      state.commits.forEach(c => {
+        const repoName = c.repository_url.split('/').pop();
+        md += `- **[${repoName}]** ${c.message.split('\n')[0]} - [Link](${c.html_url}) (${c.date.split('T')[0]})\n`;
+      });
+    }
+
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `devbrag-report-${state.user.login}-${state.dateRange.endDate}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
 
   // --- Helper to Reset ---
@@ -345,6 +405,17 @@ const App: React.FC = () => {
              <ChevronRightIcon />
              <span className="text-white font-medium">Dashboard</span>
           </div>
+          
+          {hasData && (
+            <button 
+              onClick={handleExportMarkdown}
+              className="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 rounded-lg transition-colors"
+              title="Download Report as Markdown"
+            >
+              <DownloadIcon />
+              <span>Export MD</span>
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
