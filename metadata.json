@@ -1,0 +1,5 @@
+{
+  "name": "DevBrag - Performance Review Assistant",
+  "description": "A tool for developers to fetch GitHub contributions and generate AI-powered performance summaries and self-reviews.",
+  "requestFramePermissions": []
+}
