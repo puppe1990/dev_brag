@@ -71,6 +71,35 @@ const App: React.FC = () => {
     setState(s => ({ ...s, selectedRepoIds: new Set() }));
   };
 
+  // --- Date Range Helpers ---
+  const applyDatePreset = (preset: '30d' | '90d' | '6m' | 'ytd') => {
+    const end = new Date();
+    const start = new Date();
+    
+    switch (preset) {
+      case '30d':
+        start.setDate(end.getDate() - 30);
+        break;
+      case '90d':
+        start.setDate(end.getDate() - 90);
+        break;
+      case '6m':
+        start.setMonth(start.getMonth() - 6);
+        break;
+      case 'ytd':
+        start.setFullYear(end.getFullYear(), 0, 1);
+        break;
+    }
+
+    setState(s => ({
+      ...s,
+      dateRange: {
+        startDate: start.toISOString().split('T')[0],
+        endDate: end.toISOString().split('T')[0],
+      }
+    }));
+  };
+
   // --- Data Fetching for Dashboard ---
   const handleFetchStats = useCallback(async () => {
     if (!state.user) return;
@@ -318,6 +347,33 @@ const App: React.FC = () => {
         <div className="p-6 space-y-8 flex-1">
           {/* Controls */}
           <section className="space-y-4">
+             <div className="grid grid-cols-2 gap-2">
+                <button 
+                  onClick={() => applyDatePreset('30d')}
+                  className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 py-1.5 px-2 rounded transition-colors"
+                >
+                  Last 30 Days
+                </button>
+                <button 
+                  onClick={() => applyDatePreset('90d')}
+                  className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 py-1.5 px-2 rounded transition-colors"
+                >
+                  Last 90 Days
+                </button>
+                <button 
+                  onClick={() => applyDatePreset('6m')}
+                  className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 py-1.5 px-2 rounded transition-colors"
+                >
+                  Last 6 Months
+                </button>
+                <button 
+                  onClick={() => applyDatePreset('ytd')}
+                  className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 py-1.5 px-2 rounded transition-colors"
+                >
+                  Year to Date
+                </button>
+             </div>
+
              <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">Start Date</label>
