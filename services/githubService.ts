@@ -19,12 +19,12 @@ export const fetchAuthenticatedUser = async (token: string): Promise<GitHubUser>
 
 /**
  * Fetches repositories the user has access to.
- * Sorted by updated_at to show most active ones first.
+ * Sorted by pushed_at to show most recently active ones first.
  */
 export const fetchUserRepositories = async (token: string): Promise<GitHubRepo[]> => {
-  // Fetching 100 most recently updated repos
+  // Fetching 100 most recently pushed repos
   // type=all includes public, private, and org repos the user has access to
-  const url = `${GITHUB_API_BASE}/user/repos?sort=updated&per_page=100&type=all`;
+  const url = `${GITHUB_API_BASE}/user/repos?sort=pushed&per_page=100&type=all`;
   
   const response = await fetch(url, {
     headers: {
@@ -50,6 +50,30 @@ export const fetchUserRepositories = async (token: string): Promise<GitHubRepo[]
 };
 
 /**
+ * Helper to fetch multiple pages of search results to ensure we get enough data
+ */
+const fetchSearchPages = async (url: string, headers: HeadersInit, maxPages = 2) => {
+  let allItems: any[] = [];
+  let currentPage = 1;
+
+  while (currentPage <= maxPages) {
+    const pageUrl = `${url}&page=${currentPage}`;
+    const response = await fetch(pageUrl, { headers });
+    await handleErrors(response);
+    const data = await response.json();
+    const items = data.items || [];
+    
+    if (items.length === 0) break;
+    allItems = [...allItems, ...items];
+    
+    // If we got less than the per_page limit (100), we reached the end
+    if (items.length < 100) break;
+    currentPage++;
+  }
+  return allItems;
+};
+
+/**
  * Fetches Pull Requests for a specific user within a date range.
  */
 export const fetchUserPullRequests = async (
@@ -72,15 +96,11 @@ export const fetchUserPullRequests = async (
   const query = `author:${username} type:pr created:${startDate}..${endDate}`;
   const encodedQuery = encodeURIComponent(query);
   
-  // We fetch up to 100 items for this demo.
+  // Fetch up to 2 pages (200 items) to cover active users working across many repos
   const url = `${GITHUB_API_BASE}/search/issues?q=${encodedQuery}&per_page=100&sort=created&order=desc`;
 
   try {
-    const response = await fetch(url, { headers });
-    await handleErrors(response);
-
-    const data = await response.json();
-    const items = data.items || [];
+    const items = await fetchSearchPages(url, headers, 2);
     
     // Map basic info
     const basicPRs = items.map((item: any) => ({
@@ -147,14 +167,11 @@ export const fetchUserCommits = async (
   const query = `author:${username} committer-date:${startDate}..${endDate}`;
   const encodedQuery = encodeURIComponent(query);
   
+  // Fetch up to 2 pages
   const url = `${GITHUB_API_BASE}/search/commits?q=${encodedQuery}&per_page=100&sort=committer-date&order=desc`;
 
   try {
-    const response = await fetch(url, { headers });
-    await handleErrors(response);
-
-    const data = await response.json();
-    const items = data.items || [];
+    const items = await fetchSearchPages(url, headers, 2);
 
     return items.map((item: any) => ({
       sha: item.sha,

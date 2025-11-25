@@ -34,6 +34,7 @@ const App: React.FC = () => {
 
   const [reportTone, setReportTone] = useState<ReportTone>(ReportTone.PROFESSIONAL);
   const [customFocus, setCustomFocus] = useState<string>('');
+  const [filteredCount, setFilteredCount] = useState<{hiddenPrs: number, hiddenCommits: number} | null>(null);
 
   // --- Auth & Repo Fetching ---
   const handleLogin = async (e: React.FormEvent) => {
@@ -66,11 +67,16 @@ const App: React.FC = () => {
     });
   };
 
+  const deselectAllRepos = () => {
+    setState(s => ({ ...s, selectedRepoIds: new Set() }));
+  };
+
   // --- Data Fetching for Dashboard ---
   const handleFetchStats = useCallback(async () => {
     if (!state.user) return;
     
     setState(s => ({ ...s, status: 'loading', error: null, step: 'dashboard' }));
+    setFilteredCount(null);
 
     try {
       // 1. Fetch ALL data via search (GitHub API is optimized for author search)
@@ -90,23 +96,34 @@ const App: React.FC = () => {
       ]);
 
       // 2. Filter based on selected repositories
-      // Note: GitHub Search API returns `repository_url` (API URL)
-      // We need to match it against our selected repos.
+      const selectedRepos = state.repositories.filter(r => state.selectedRepoIds.has(r.id));
       
-      const selectedRepoUrls = new Set(
-        state.repositories
-          .filter(r => state.selectedRepoIds.has(r.id))
-          .map(r => r.url)
-      );
+      // Robust matching logic
+      const filteredPrs = allPrs.filter(pr => {
+        const prRepoName = pr.repository_url.replace('https://api.github.com/repos/', '');
+        return selectedRepos.some(repo => 
+          repo.url === pr.repository_url || // Exact API URL match
+          repo.full_name === prRepoName // Name match (handles some format diffs)
+        );
+      });
 
-      const filteredPrs = allPrs.filter(pr => selectedRepoUrls.has(pr.repository_url));
       const filteredCommits = allCommits.filter(c => 
-        // Commits often have inconsistent repo URLs in search results depending on headers
-        // Simple heuristic: check if HTML url starts with repo html url
-        state.repositories.some(r => 
-          state.selectedRepoIds.has(r.id) && c.html_url.startsWith(r.html_url)
+        selectedRepos.some(repo => 
+          c.html_url.startsWith(repo.html_url) || // Standard html url prefix match
+          c.repository_url === repo.html_url // Direct match if available
         )
       );
+
+      // Check if we hid data
+      if (allPrs.length > 0 || allCommits.length > 0) {
+        if (filteredPrs.length === 0 && filteredCommits.length === 0) {
+           // Warning: We found data but filtered it all out
+           setFilteredCount({
+             hiddenPrs: allPrs.length,
+             hiddenCommits: allCommits.length
+           });
+        }
+      }
 
       setState(s => ({ 
         ...s, 
@@ -209,6 +226,7 @@ const App: React.FC = () => {
           repos={state.repositories}
           selectedRepoIds={state.selectedRepoIds}
           onToggleRepo={toggleRepo}
+          onDeselectAll={deselectAllRepos}
           onContinue={handleFetchStats}
           isLoading={state.status === 'loading'}
         />
@@ -339,6 +357,11 @@ const App: React.FC = () => {
               <p className="text-slate-400">
                 Adjust the date range or select different repositories to view stats.
               </p>
+              {filteredCount && (
+                <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-800 rounded-lg text-yellow-500 text-sm">
+                  Found {filteredCount.hiddenPrs} PRs and {filteredCount.hiddenCommits} Commits, but they were all filtered out because they don't match the selected repositories.
+                </div>
+              )}
             </div>
            )}
 

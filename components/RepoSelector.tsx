@@ -5,6 +5,7 @@ interface RepoSelectorProps {
   repos: GitHubRepo[];
   selectedRepoIds: Set<number>;
   onToggleRepo: (id: number) => void;
+  onDeselectAll: () => void;
   onContinue: () => void;
   isLoading: boolean;
 }
@@ -13,6 +14,7 @@ const RepoSelector: React.FC<RepoSelectorProps> = ({
   repos, 
   selectedRepoIds, 
   onToggleRepo, 
+  onDeselectAll,
   onContinue,
   isLoading 
 }) => {
@@ -46,15 +48,22 @@ const RepoSelector: React.FC<RepoSelectorProps> = ({
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+      <div className="flex flex-col md:flex-row gap-4 justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700 shadow-sm">
         <input 
           type="text" 
-          placeholder="Search repositories..." 
+          placeholder="Search repositories by name..." 
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 outline-none"
         />
         <div className="flex gap-2">
+          <button 
+            onClick={onDeselectAll}
+            disabled={selectedRepoIds.size === 0}
+            className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+          >
+            Clear Selection
+          </button>
           <button 
             onClick={toggleAll}
             className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
@@ -72,14 +81,14 @@ const RepoSelector: React.FC<RepoSelectorProps> = ({
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
         {filteredRepos.map(repo => {
           const isSelected = selectedRepoIds.has(repo.id);
           return (
             <div 
               key={repo.id}
               onClick={() => onToggleRepo(repo.id)}
-              className={`cursor-pointer p-4 rounded-lg border transition-all duration-200 flex items-start gap-3
+              className={`cursor-pointer p-4 rounded-lg border transition-all duration-200 flex items-start gap-3 select-none
                 ${isSelected 
                   ? 'bg-indigo-500/10 border-indigo-500/50 hover:bg-indigo-500/20' 
                   : 'bg-slate-800/30 border-slate-700 hover:border-slate-500 hover:bg-slate-800'
@@ -106,7 +115,7 @@ const RepoSelector: React.FC<RepoSelectorProps> = ({
                 {repo.description && (
                   <p className="text-xs text-slate-500 truncate mt-1">{repo.description}</p>
                 )}
-                <p className="text-[10px] text-slate-600 mt-2">Updated: {new Date(repo.updated_at).toLocaleDateString()}</p>
+                <p className="text-[10px] text-slate-600 mt-2">Last Pushed: {new Date(repo.updated_at).toLocaleDateString()}</p>
               </div>
             </div>
           );
