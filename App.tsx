@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { AppState, DateRange, ReportTone, GitHubPR, GitHubCommit } from './types';
 import { fetchAuthenticatedUser, fetchUserRepositories, fetchUserPullRequests, fetchUserCommits } from './services/githubService';
 import { generateSelfReview } from './services/geminiService';
@@ -71,39 +71,14 @@ const App: React.FC = () => {
     setState(s => ({ ...s, selectedRepoIds: new Set() }));
   };
 
-  // --- Date Range Helpers ---
-  const applyDatePreset = (preset: '30d' | '90d' | '6m' | 'ytd') => {
-    const end = new Date();
-    const start = new Date();
-    
-    switch (preset) {
-      case '30d':
-        start.setDate(end.getDate() - 30);
-        break;
-      case '90d':
-        start.setDate(end.getDate() - 90);
-        break;
-      case '6m':
-        start.setMonth(start.getMonth() - 6);
-        break;
-      case 'ytd':
-        start.setFullYear(end.getFullYear(), 0, 1);
-        break;
-    }
-
-    setState(s => ({
-      ...s,
-      dateRange: {
-        startDate: start.toISOString().split('T')[0],
-        endDate: end.toISOString().split('T')[0],
-      }
-    }));
-  };
-
   // --- Data Fetching for Dashboard ---
-  const handleFetchStats = useCallback(async () => {
+  // Removed useCallback to prevent stale state issues
+  const handleFetchStats = async (dateRangeOverride?: DateRange) => {
     if (!state.user) return;
     
+    // Use override if provided (for presets), otherwise state
+    const currentRange = dateRangeOverride || state.dateRange;
+
     setState(s => ({ ...s, status: 'loading', error: null, step: 'dashboard' }));
     setFilteredCount(null);
 
@@ -113,14 +88,14 @@ const App: React.FC = () => {
         fetchUserPullRequests(
           state.user.login,
           state.githubToken,
-          state.dateRange.startDate,
-          state.dateRange.endDate
+          currentRange.startDate,
+          currentRange.endDate
         ),
         fetchUserCommits(
           state.user.login,
           state.githubToken,
-          state.dateRange.startDate,
-          state.dateRange.endDate
+          currentRange.startDate,
+          currentRange.endDate
         )
       ]);
 
@@ -165,11 +140,41 @@ const App: React.FC = () => {
     } catch (err: any) {
       setState(s => ({ ...s, status: 'error', error: err.message }));
     }
-  }, [state.user, state.githubToken, state.dateRange, state.repositories, state.selectedRepoIds]);
+  };
 
+  // --- Date Range Helpers ---
+  const applyDatePreset = (preset: '30d' | '90d' | '6m' | 'ytd') => {
+    const end = new Date();
+    const start = new Date();
+    
+    switch (preset) {
+      case '30d':
+        start.setDate(end.getDate() - 30);
+        break;
+      case '90d':
+        start.setDate(end.getDate() - 90);
+        break;
+      case '6m':
+        start.setMonth(start.getMonth() - 6);
+        break;
+      case 'ytd':
+        start.setFullYear(end.getFullYear(), 0, 1);
+        break;
+    }
+
+    const newRange = {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0],
+    };
+
+    // Update state AND trigger fetch immediately
+    setState(s => ({ ...s, dateRange: newRange }));
+    handleFetchStats(newRange);
+  };
 
   // --- AI Report Generation ---
-  const handleGenerateReport = useCallback(async () => {
+  // Removed useCallback to prevent stale state issues
+  const handleGenerateReport = async () => {
     if (state.prs.length === 0 && state.commits.length === 0) return;
 
     setState(s => ({ ...s, status: 'analyzing_ai', error: null }));
@@ -186,7 +191,7 @@ const App: React.FC = () => {
     } catch (err: any) {
       setState(s => ({ ...s, status: 'error', error: 'Failed to generate report using AI.' }));
     }
-  }, [state.user, state.prs, state.commits, reportTone, customFocus]);
+  };
 
   // --- Export Markdown ---
   const handleExportMarkdown = () => {
@@ -316,7 +321,7 @@ const App: React.FC = () => {
           selectedRepoIds={state.selectedRepoIds}
           onToggleRepo={toggleRepo}
           onDeselectAll={deselectAllRepos}
-          onContinue={handleFetchStats}
+          onContinue={() => handleFetchStats()}
           isLoading={state.status === 'loading'}
         />
       </div>
@@ -403,7 +408,7 @@ const App: React.FC = () => {
                 Edit Repos ({state.selectedRepoIds.size})
               </button>
               <button 
-                onClick={handleFetchStats}
+                onClick={() => handleFetchStats()}
                 disabled={state.status === 'loading'}
                 className="flex-none px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md flex items-center justify-center transition-colors"
               >
@@ -513,7 +518,12 @@ const App: React.FC = () => {
 
                <div className="bg-slate-800/30 border border-slate-800 p-6 rounded-xl">
                   <h3 className="text-lg font-medium text-white mb-4">Timeline</h3>
-                  <ActivityChart prs={state.prs} commits={state.commits} />
+                  <ActivityChart 
+                    prs={state.prs} 
+                    commits={state.commits} 
+                    startDate={state.dateRange.startDate}
+                    endDate={state.dateRange.endDate}
+                  />
                </div>
 
                <div className="bg-slate-800/30 border border-slate-800 p-6 rounded-xl">
