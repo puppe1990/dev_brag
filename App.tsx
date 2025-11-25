@@ -84,6 +84,7 @@ const App: React.FC = () => {
 
     try {
       // 1. Fetch ALL data via search (GitHub API is optimized for author search)
+      // Fetching up to 1000 items (10 pages) to ensure we get older data even if user is very active
       const [allPrs, allCommits] = await Promise.all([
         fetchUserPullRequests(
           state.user.login,
@@ -491,11 +492,20 @@ const App: React.FC = () => {
            {!hasData && !state.error && (
             <div className="h-full flex flex-col items-center justify-center text-center max-w-lg mx-auto pb-20 opacity-60">
               <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mb-6 text-slate-600">
-                <DocumentIcon />
+                {state.status === 'loading' ? (
+                   <div className="w-8 h-8 border-4 border-slate-600 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                   <DocumentIcon />
+                )}
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">No activity loaded</h2>
+              <h2 className="text-xl font-bold text-white mb-2">
+                {state.status === 'loading' ? 'Fetching Activity...' : 'No activity loaded'}
+              </h2>
               <p className="text-slate-400">
-                Adjust the date range or select different repositories to view stats.
+                {state.status === 'loading' 
+                  ? 'We are scanning up to 1000 recent items from your history. This might take a moment.'
+                  : 'Adjust the date range or select different repositories to view stats.'
+                }
               </p>
               {filteredCount && (
                 <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-800 rounded-lg text-yellow-500 text-sm">
@@ -553,8 +563,8 @@ const App: React.FC = () => {
                    </div>
                    <div className="bg-slate-950 border border-slate-800 rounded-xl p-8 shadow-2xl overflow-hidden relative">
                       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500"></div>
-                      <div className="prose prose-invert prose-sm md:prose-base max-w-none whitespace-pre-wrap font-mono text-slate-300">
-                        {state.generatedReport}
+                      <div className="prose prose-invert prose-sm md:prose-base max-w-none whitespace-pre-wrap font-mono">
+                         {state.generatedReport}
                       </div>
                    </div>
                  </div>
