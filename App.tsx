@@ -228,7 +228,15 @@ const App: React.FC = () => {
         md += `- **State:** ${pr.merged_at ? 'Merged' : pr.state}\n`;
         md += `- **Date:** ${pr.created_at.split('T')[0]}\n`;
         if (impact) md += `- **Stats:** ${impact}\n`;
-        md += `- **Link:** ${pr.html_url}\n\n`;
+        md += `- **Link:** ${pr.html_url}\n`;
+        
+        if (pr.body) {
+          md += `\n**Description:**\n\n`;
+          // Clean up newlines for blockquote format and prevent overly destructive replacements
+          const cleanBody = pr.body.replace(/\r\n/g, '\n').replace(/\n/g, '\n> ');
+          md += `> ${cleanBody}\n`;
+        }
+        md += `\n`;
       });
     }
 
